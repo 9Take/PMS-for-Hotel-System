@@ -1,0 +1,90 @@
+# ===========================================
+# OMS System - Development Docker Compose
+# Run: docker compose up -d
+# ===========================================
+
+services:
+  # --- PostgreSQL Database ---
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-oms}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./src/backend/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # --- Redis ---
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # --- FastAPI Backend ---
+  backend:
+    build:
+      context: ./src/backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-oms}
+      REDIS_URL: redis://redis:6379/0
+      DEBUG: "true"
+    env_file:
+      - .env
+    volumes:
+      - ./src/backend/app:/app/app:ro
+      - pdf_output:/app/generated_pdfs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # --- n8n Workflow Automation ---
+  n8n:
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: http
+      N8N_SECURE_COOKIE: "false"
+      GENERIC_TIMEZONE: Asia/Bangkok
+      # FastAPI reachable at http://backend:8000 from inside workflows
+      WEBHOOK_URL: http://localhost:5678/
+    volumes:
+      - n8ndata:/home/node/.n8n
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+  pdf_output:
+    driver: local
+  n8ndata:
+    driver: local

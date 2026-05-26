@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page { size: A4; margin: 2cm; }
+        body { font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; font-size: 14px; color: #333; }
+        .header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 15px; margin-bottom: 20px; }
+        .header h1 { color: #2563eb; margin: 0; font-size: 24px; }
+        .header p { margin: 3px 0; color: #666; font-size: 12px; }
+        .receipt-title { text-align: center; font-size: 20px; font-weight: bold; color: #1e40af; margin: 20px 0; }
+        .info-grid { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .info-block { width: 48%; }
+        .info-block h3 { color: #2563eb; font-size: 14px; margin-bottom: 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; }
+        .info-block p { margin: 4px 0; font-size: 13px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th { background-color: #2563eb; color: white; padding: 10px; text-align: left; font-size: 13px; }
+        td { padding: 10px; border-bottom: 1px solid #e5e7eb; font-size: 13px; }
+        .total-row td { font-weight: bold; font-size: 16px; border-top: 2px solid #2563eb; }
+        .footer { text-align: center; margin-top: 40px; font-size: 11px; color: #999; border-top: 1px solid #e5e7eb; padding-top: 15px; }
+        .stamp { text-align: right; margin-top: 40px; }
+        .stamp p { margin: 3px 0; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ villa_name }}</h1>
+        <p>{{ villa_address }}</p>
+        <p>โทร: {{ villa_phone }} | Tax ID: {{ villa_tax_id }}</p>
+    </div>
+
+    <div class="receipt-title">ใบเสร็จรับเงิน / Receipt</div>
+
+    <div class="info-grid">
+        <div class="info-block">
+            <h3>ข้อมูลผู้เข้าพัก</h3>
+            <p><strong>ชื่อ:</strong> {{ guest_name }}</p>
+            <p><strong>Booking ID:</strong> #{{ booking_id }}</p>
+        </div>
+        <div class="info-block">
+            <h3>รายละเอียดการเข้าพัก</h3>
+            <p><strong>ห้อง:</strong> {{ room_number }}</p>
+            <p><strong>เช็คอิน:</strong> {{ check_in }}</p>
+            <p><strong>เช็คเอาท์:</strong> {{ check_out }}</p>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>รายการ</th>
+                <th>จำนวนคืน</th>
+                <th>ราคา/คืน</th>
+                <th>รวม</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>ค่าห้องพัก — {{ room_number }}</td>
+                <td>{{ nights }}</td>
+                <td>{{ "%.2f"|format(total_price / nights) }} ฿</td>
+                <td>{{ "%.2f"|format(total_price) }} ฿</td>
+            </tr>
+            <tr class="total-row">
+                <td colspan="3">ยอดรวมทั้งสิ้น</td>
+                <td>{{ "%.2f"|format(total_price) }} ฿</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p><strong>วันที่ชำระเงิน:</strong> {{ payment_date }}</p>
+
+    <div class="stamp">
+        <p>ลงชื่อ ................................</p>
+        <p>(ผู้รับเงิน)</p>
+        <p>วันที่: {{ generated_at }}</p>
+    </div>
+
+    <div class="footer">
+        <p>เอกสารนี้ออกโดยระบบ HospitAI — {{ villa_name }}</p>
+    </div>
+</body>
+</html>
