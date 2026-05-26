@@ -1,0 +1,26 @@
+# FastAPI & Server
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+python-multipart==0.0.9
+
+# Database
+sqlalchemy[asyncio]==2.0.35
+asyncpg==0.29.0
+alembic==1.13.2
+
+# Redis
+redis==5.1.0
+
+# Validation & Settings
+pydantic==2.9.0
+pydantic-settings==2.5.0
+
+# PDF Generation
+weasyprint==62.3
+jinja2==3.1.4
+
+# HTTP Client (for SlipOK API)
+httpx==0.27.2
+
+# Date/Time
+python-dateutil==2.9.0
