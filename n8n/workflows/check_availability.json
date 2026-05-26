@@ -1,0 +1,54 @@
+{
+  "id": "checkavail0001",
+  "name": "Check Availability",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "check-availability",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 300],
+      "webhookId": "check-availability"
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8000/api/v1/bookings/availability",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "check_in", "value": "={{ $json.query.check_in }}" },
+            { "name": "check_out", "value": "={{ $json.query.check_out }}" },
+            { "name": "num_guests", "value": "={{ $json.query.num_guests || 1 }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-node",
+      "name": "FastAPI Availability",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rooms = $input.all().map(i => i.json).filter(r => r && r.room);\nif (rooms.length === 0) {\n  return [{ json: { message: 'No rooms available for those dates.' } }];\n}\nconst lines = rooms.map(r => `${r.room.room_number} (${r.room.type}) — ${r.nights} night(s) = ${r.total_price} THB`);\nreturn [{ json: { count: rooms.length, summary: lines.join('\\n'), rooms } }];"
+      },
+      "id": "format-node",
+      "name": "Format Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [740, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "FastAPI Availability", "type": "main", "index": 0 }]] },
+    "FastAPI Availability": { "main": [[{ "node": "Format Reply", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
