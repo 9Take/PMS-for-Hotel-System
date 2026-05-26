@@ -1,6 +1,6 @@
-# OMS - Order Management System
+# Smart Hotel Management System
 
-A comprehensive order management system for Pool Villa, built with FastAPI and PostgreSQL. This system manages room bookings, calculates prices based on day types (weekday, weekend, holidays), handles extra guest fees, and generates printable invoices.
+A comprehensive order management system for Hotel/Pool-Villa, built with FastAPI and PostgreSQL. This system manages room bookings, calculates prices based on day types (weekday, weekend, holidays), handles extra guest fees, and generates printable invoices.
 
 ## Features
 
