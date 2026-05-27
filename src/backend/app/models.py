@@ -39,6 +39,12 @@ class DiscountType(str, enum.Enum):
     fixed = "fixed"
 
 
+class DayType(str, enum.Enum):
+    mon_thu = "mon_thu"
+    fri_sun = "fri_sun"
+    sat = "sat"
+
+
 # --- Models ---
 
 class Room(Base):
@@ -54,9 +60,18 @@ class Room(Base):
         Enum(RoomStatus, name="room_status"), default=RoomStatus.available
     )
     images: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    extra_bed_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    max_extra_beds: Mapped[int] = mapped_column(Integer, default=0)
+    child_free_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     bookings: Mapped[list["Booking"]] = relationship(back_populates="room")
+    rates: Mapped[list["RoomRate"]] = relationship(
+        back_populates="room", cascade="all, delete-orphan"
+    )
+    rate_overrides: Mapped[list["RateOverride"]] = relationship(
+        back_populates="room", cascade="all, delete-orphan"
+    )
 
 
 class Guest(Base):
@@ -135,3 +150,33 @@ class Promotion(Base):
     end_date: Mapped[date] = mapped_column(Date)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class RoomRate(Base):
+    __tablename__ = "room_rates"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    room_id: Mapped[int] = mapped_column(ForeignKey("rooms.id", ondelete="CASCADE"))
+    day_type: Mapped[DayType] = mapped_column(Enum(DayType, name="rate_day_type"))
+    price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    base_guests: Mapped[int] = mapped_column(Integer)
+    label: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    room: Mapped["Room"] = relationship(back_populates="rates")
+
+
+class RateOverride(Base):
+    __tablename__ = "rate_overrides"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    room_id: Mapped[int] = mapped_column(ForeignKey("rooms.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(100))
+    start_month: Mapped[int] = mapped_column(Integer)
+    start_day: Mapped[int] = mapped_column(Integer)
+    end_month: Mapped[int] = mapped_column(Integer)
+    end_day: Mapped[int] = mapped_column(Integer)
+    flat_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    room: Mapped["Room"] = relationship(back_populates="rate_overrides")
