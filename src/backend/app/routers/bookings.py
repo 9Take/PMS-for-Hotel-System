@@ -11,6 +11,7 @@ from app.database import get_db
 from app.models import Booking, Transaction, BookingStatus
 from app.schemas import (
     BookingCreate, BookingResponse, BookingUpdate,
+    BookingWithQuoteResponse, NightBreakdownResponse, QuoteResponse,
     TransactionCreate, TransactionResponse, TransactionApprove,
     AvailabilityResponse,
 )
@@ -18,7 +19,21 @@ from app.services.booking import (
     get_available_rooms, create_hold_booking, confirm_booking,
     cancel_booking, expire_stale_holds,
 )
+from app.services.pricing import PricingError
 from app.services.slipok import verify_slip
+
+
+def _quote_to_response(quote) -> QuoteResponse:
+    return QuoteResponse(
+        room_id=quote.room_id,
+        nights=[NightBreakdownResponse(**n.__dict__) for n in quote.nights],
+        room_subtotal=quote.room_subtotal,
+        extra_bed_subtotal=quote.extra_bed_subtotal,
+        total=quote.total,
+        peak_extras_needed=quote.peak_extras_needed,
+        requires_admin=quote.requires_admin,
+        notes=quote.notes,
+    )
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
 
@@ -27,13 +42,14 @@ router = APIRouter(prefix="/bookings", tags=["Bookings"])
 async def check_availability(
     check_in: date = Query(...),
     check_out: date = Query(...),
-    num_guests: int = Query(1),
+    adults: int = Query(1, ge=1),
+    children_0_5: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
-    """Check which rooms are available for the given dates."""
+    """Check which rooms are available + their priced quote for the dates."""
     if check_in >= check_out:
         raise HTTPException(400, "check_in must be before check_out")
-    rooms = await get_available_rooms(db, check_in, check_out, num_guests)
+    rooms = await get_available_rooms(db, check_in, check_out, adults, children_0_5)
     return rooms
 
 
@@ -65,22 +81,36 @@ async def get_booking(booking_id: int, db: AsyncSession = Depends(get_db)):
     return booking
 
 
-@router.post("/", response_model=BookingResponse, status_code=201)
+@router.post("/", response_model=BookingWithQuoteResponse, status_code=201)
 async def create_booking(data: BookingCreate, db: AsyncSession = Depends(get_db)):
-    """Create a new booking with HOLD status (30-minute lock)."""
+    """Create a HOLD booking (30-min lock). Total is computed server-side."""
     try:
-        booking = await create_hold_booking(
+        booking, quote = await create_hold_booking(
             db,
             guest_id=data.guest_id,
             room_id=data.room_id,
             check_in=data.check_in,
             check_out=data.check_out,
-            num_guests=data.num_guests,
-            total_price=data.total_price,
+            adults=data.adults,
+            children_0_5=data.children_0_5,
         )
+    except PricingError as e:
+        raise HTTPException(422, f"Pricing error: {e}")
     except ValueError as e:
         raise HTTPException(400, str(e))
-    return booking
+
+    # Re-load with eager relationships so Pydantic from_attributes doesn't try
+    # a lazy fetch on a closed greenlet context.
+    result = await db.execute(
+        select(Booking).where(Booking.id == booking.id).options(
+            selectinload(Booking.guest), selectinload(Booking.room)
+        )
+    )
+    booking = result.scalars().first()
+    return BookingWithQuoteResponse(
+        booking=BookingResponse.model_validate(booking),
+        quote=_quote_to_response(quote),
+    )
 
 
 @router.post("/{booking_id}/confirm", response_model=BookingResponse)

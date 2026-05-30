@@ -1,0 +1,84 @@
+{
+  "id": "syncholidays0001",
+  "name": "Sync Holidays from Google Calendar",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "0 3 * * *" }
+          ]
+        }
+      },
+      "id": "cron-node",
+      "name": "Daily 03:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sync window: today through +18 months. Long enough to cover any\n// booking lead time; short enough that each sync is cheap.\nconst start = new Date();\nstart.setUTCHours(0, 0, 0, 0);\nconst end = new Date(start);\nend.setUTCMonth(end.getUTCMonth() + 18);\nconst fmt = (d) => d.toISOString().slice(0, 10);\nreturn [{ json: {\n  window_start: fmt(start),\n  window_end: fmt(end),\n  timeMin: start.toISOString(),\n  timeMax: end.toISOString(),\n} }];"
+      },
+      "id": "window-node",
+      "name": "Compute Window",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent('en.th#holiday@group.v.calendar.google.com') }}/events",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "timeMin", "value": "={{ $json.timeMin }}" },
+            { "name": "timeMax", "value": "={{ $json.timeMax }}" },
+            { "name": "singleEvents", "value": "true" },
+            { "name": "maxResults", "value": "2500" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-node",
+      "name": "Fetch Thai Holidays",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Google Calendar returns each holiday as an all-day event with\n// start.date = 'YYYY-MM-DD'. Multi-day spans get expanded by\n// singleEvents=true so we don't need to enumerate ourselves.\nconst window = $('Compute Window').first().json;\nconst events = $input.first().json.items || [];\nconst holidays = events\n  .map(e => ({\n    date: (e.start && e.start.date) || (e.start && e.start.dateTime && e.start.dateTime.slice(0, 10)),\n    name: e.summary || 'Holiday',\n    surcharge: 1000,\n  }))\n  .filter(h => h.date && h.date >= window.window_start && h.date < window.window_end);\nreturn [{ json: {\n  window_start: window.window_start,\n  window_end: window.window_end,\n  holidays,\n  source: 'google_calendar',\n} }];"
+      },
+      "id": "map-node",
+      "name": "Map to Sync Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/api/v1/admin/holidays/sync",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "post-node",
+      "name": "POST /admin/holidays/sync",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1080, 300]
+    }
+  ],
+  "connections": {
+    "Daily 03:00": { "main": [[{ "node": "Compute Window", "type": "main", "index": 0 }]] },
+    "Compute Window": { "main": [[{ "node": "Fetch Thai Holidays", "type": "main", "index": 0 }]] },
+    "Fetch Thai Holidays": { "main": [[{ "node": "Map to Sync Payload", "type": "main", "index": 0 }]] },
+    "Map to Sync Payload": { "main": [[{ "node": "POST /admin/holidays/sync", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

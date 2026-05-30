@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.database import engine, Base
-from app.routers import health, rooms, guests, bookings
+from app.routers import admin, health, rooms, guests, bookings
 
 
 @asynccontextmanager
@@ -27,3 +27,4 @@ app.include_router(health.router)
 app.include_router(rooms.router, prefix="/api/v1")
 app.include_router(guests.router, prefix="/api/v1")
 app.include_router(bookings.router, prefix="/api/v1")
+app.include_router(admin.router, prefix="/api/v1")

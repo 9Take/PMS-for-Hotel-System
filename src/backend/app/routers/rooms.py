@@ -1,12 +1,17 @@
 """Room management API endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import date
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import Room
-from app.schemas import RoomCreate, RoomResponse, RoomUpdate
+from app.schemas import (
+    NightBreakdownResponse, QuoteResponse, RoomCreate, RoomResponse, RoomUpdate,
+)
+from app.services.pricing import PricingError, quote_booking
 
 router = APIRouter(prefix="/rooms", tags=["Rooms"])
 
@@ -46,6 +51,34 @@ async def update_room(
     await db.commit()
     await db.refresh(room)
     return room
+
+
+@router.get("/{room_id}/quote", response_model=QuoteResponse)
+async def quote_room(
+    room_id: int,
+    check_in: date = Query(...),
+    check_out: date = Query(...),
+    adults: int = Query(1, ge=1),
+    children_0_5: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+):
+    """Price a stay without creating a hold. Returns full per-night breakdown."""
+    try:
+        quote = await quote_booking(
+            db, room_id, check_in, check_out, adults, children_0_5
+        )
+    except PricingError as e:
+        raise HTTPException(422, f"Pricing error: {e}")
+    return QuoteResponse(
+        room_id=quote.room_id,
+        nights=[NightBreakdownResponse(**n.__dict__) for n in quote.nights],
+        room_subtotal=quote.room_subtotal,
+        extra_bed_subtotal=quote.extra_bed_subtotal,
+        total=quote.total,
+        peak_extras_needed=quote.peak_extras_needed,
+        requires_admin=quote.requires_admin,
+        notes=quote.notes,
+    )
 
 
 @router.delete("/{room_id}", status_code=204)

@@ -97,6 +97,8 @@ class Booking(Base):
     check_in: Mapped[date] = mapped_column(Date)
     check_out: Mapped[date] = mapped_column(Date)
     num_guests: Mapped[int] = mapped_column(Integer, default=1)
+    adults: Mapped[int] = mapped_column(Integer, default=1)
+    children_0_5: Mapped[int] = mapped_column(Integer, default=0)
     total_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     status: Mapped[BookingStatus] = mapped_column(
         Enum(BookingStatus, name="booking_status"), default=BookingStatus.hold
@@ -149,6 +151,17 @@ class Promotion(Base):
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[date] = mapped_column(Date)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class Holiday(Base):
+    __tablename__ = "holidays"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    date: Mapped[date] = mapped_column(Date, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    surcharge: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("1000"))
+    source: Mapped[str] = mapped_column(String(50), default="google_calendar")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
